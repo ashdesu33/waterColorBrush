@@ -1,0 +1,102 @@
+@font-face{
+font-family: 'Gravity'; 
+src: url('ABCGravityVariable-Trial.ttf') 
+format('truetype'); 
+font-weight: normal; 
+font-style: normal; 
+} 
+
+html, body { 
+margin: 0; 
+padding: 0; 
+font-family:'Gravity'; 
+width:100%;
+} 
+
+canvas {
+  background:transparent;
+  mix-blend-mode: multiply;
+}
+
+body { margin: 0; display: flex; overflow: hidden;
+background:#000;} 
+
+#brushtool{ display:inline-flex; justify-content:center; } 
+
+#sidebar { 
+  width: 220px; 
+  height:780px;
+  background: #f5f5f5; 
+  padding: 15px; 
+  box-shadow: 2px 0 6px rgba(0, 0, 0, 0.1); 
+} 
+
+#canvas-container { 
+flex: 1; position: relative; 
+justify-content: center; 
+}
+
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+button {
+  align-items: center;
+  background-color: #fff;
+  border: 2px solid #000;
+  box-sizing: border-box;
+  color: #000;
+  cursor: pointer;
+  display: inline-flex;
+  fill: #000;
+  font-size: 13px;
+  font-weight: 600;
+  height: 24px;
+  justify-content: center;
+  letter-spacing: -.8px;
+  line-height: 24px;
+  width: 100%;
+  outline: 0;
+  margin-bottom:5px;
+  padding: 10px 17px;
+  text-align: center;
+  text-decoration: none;
+  transition: all .3s;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+button:focus {
+  color: #171e29;
+}
+
+button:hover {
+  color: #FFFFFF;
+  fill: #FFFFFF;
+  background-color: #000000;
+}
+
+button:active {
+  color: #FFFFFF;
+  fill: #FFFFFF;
+  background-color: #000000;
+}
+
+
+
+#brushtool {
+  display: fle#00BCD4
+  flex-direction: row;
+  align-items: flex-start; /* don't vertically center canvas */
+  justify-content: center;
+  gap: 20px;
+}
+
+#canvas-container {
+  position: relative;
+  background: #fff;
+}

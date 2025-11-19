@@ -90,8 +90,8 @@ const WHITE_HOLD_FRAMES = 18;
 
 function preload() {
   // customFont = loadFont("ABCGravityVariable-Trial.ttf"); 
-  svg1 = loadImage("template/template_1.svg");
-  svg2 = loadImage("template/template_2.svg");
+  svg1 = loadImage("./template/template_1.svg");
+  svg2 = loadImage("./template/template_2.svg");
 }
 
 function setup() {

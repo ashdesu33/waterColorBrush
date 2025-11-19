@@ -7,15 +7,29 @@ const palettes = [
 ];
 
 
+// ------------ Var:UI ---------------
 let currentPaletteIndex = 0;      
 let palette = palettes[currentPaletteIndex];
-
 let colorButtons = [];
 let currentColorIndex = 0;       
-
 let usePaletteGradient = true;    // checkbox toggles this
 let gradientToggle;
 let selectedButton = null;
+let sliderDrops,
+  buttonDry,
+  buttonWet,
+  buttonDefault,
+  bgColorPicker,
+  colorPicker;
+let state;
+let gradientMix = 0;
+let strokeGradientT = 0;
+let strokeActive = false;
+let templateSelector;
+let currentTemplate = 0; // 0 = none, 1 = template1, 2 = template2
+let svg1, svg2;
+let bgColor = "#fff"
+// ------------ Var:Brush ---------------
 let defaultTime = 0.001;
 let runnyColors = false;
 let backgrd = 255;
@@ -32,13 +46,7 @@ let paintC1 = [];
 let paintC2 = [];
 let gradientFactor = 1;
 
-let sliderDrops,
-  buttonDry,
-  buttonWet,
-  buttonDefault,
-  bgColorPicker,
-  colorPicker;
-let state;
+
 let prevMouseX, prevMouseY;
 
 let paintLayer; // offscreen 2D buffer for your original code
@@ -47,11 +55,8 @@ let paintColorIndex = [];
 
 let hueShiftSpeed = 0.015;
 
-let colorPicker1, colorPicker2;
-let gradientMix = 0;
-let strokeGradientT = 0;
-let strokeActive = false;
 
+// ------------ Var:Recording ---------------
 let recordedStrokes = [];
 let replaying = false;
 let replayProgress = 0;
@@ -71,8 +76,6 @@ let liveText = "";
 let liveFontSize = 300;
 let showText = false;
 
-let customFont;
-
 let brushAngle = 0;
 let brushStrokeActive = false;
 
@@ -86,14 +89,15 @@ const WHITE_HOLD_FRAMES = 18;
 
 
 function preload() {
-  customFont = loadFont("ABCGravityVariable-Trial.ttf"); 
+  // customFont = loadFont("ABCGravityVariable-Trial.ttf"); 
+  svg1 = loadImage("/template/template_1.svg");
+  svg2 = loadImage("/template/template_2.svg");
 }
 
 function setup() {
   pixelDensity(1);
-  const canvas = createCanvas(800, 800);
+  const canvas = createCanvas(640, 800);
   canvas.parent("canvas-container");
-  textFont(customFont);
   background(backgrd);
   uiPanel();
   initialCanvas();
@@ -105,49 +109,11 @@ function setup() {
   createFluffyBrushTip();
 }
 
-function createFluffyBrushTip() {
-  brushTip.noStroke();
+// ------------ DRAW METHOD ---------------
 
-  const w = brushTip.width;
-  const h = brushTip.height;
-  const cx = w / 2;
-  const cy = h / 2;
-  const maxR = min(w, h) * 0.45;
-  const noiseScale = 0.15;
-
-  // Draw alpha only: white with varying opacity
-  for (let x = 0; x < w; x++) {
-    for (let y = 0; y < h; y++) {
-      const dx = x - cx;
-      const dy = y - cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist > maxR) continue;
-
-      let falloff = 1 - dist / maxR;
-      falloff = falloff * falloff; // smooth
-
-      // edge fluff via noise
-      let n = noise(x * noiseScale, y * noiseScale);
-      falloff *= map(n, 0, 1, 0.7, 1.3);
-      falloff = constrain(falloff, 0, 1);
-
-      // watery: low alpha
-      const alpha = falloff * 255 * 0.4;
-
-      brushTip.fill(255, 255, 255, alpha); // white; we’ll tint in paint[]
-      brushTip.rect(x, y, 1, 1);
-    }
-  }
-
-  // cache the pixels so we can read alpha when stamping
-  brushTip.loadPixels();
-  brushTipPixels = brushTip.pixels;
-  brushTipW = brushTip.width;
-  brushTipH = brushTip.height;
-}
-///// updated draw() with incremental replay + easing + 60fps enforcement
 function draw() {
   frameRate(60);
+
 
   if (replaying) {
 
@@ -254,8 +220,17 @@ function draw() {
     render();
   }
 
+    push();
+blendMode(MULTIPLY);
+noStroke();
+fill(bgColor);
+rect(0, 0, width, height);
+pop();
+blendMode(BLEND);
+
   // UI text overlay
   addTextToCanvas();
+  drawTemplateOverlay();
 
     // --- APPLY FADE OUT LAYER ---
   // APPLY WHITE OVERLAY IN FADE + HOLD
@@ -292,6 +267,49 @@ if (replayPhase === "fadeOut" || replayPhase === "whiteHold") {
   }
 
 }
+
+
+function createFluffyBrushTip() {
+  brushTip.noStroke();
+
+  const w = brushTip.width;
+  const h = brushTip.height;
+  const cx = w / 2;
+  const cy = h / 2;
+  const maxR = min(w, h) * 0.45;
+  const noiseScale = 0.15;
+
+  // Draw alpha only: white with varying opacity
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) {
+      const dx = x - cx;
+      const dy = y - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > maxR) continue;
+
+      let falloff = 1 - dist / maxR;
+      falloff = falloff * falloff; // smooth
+
+      // edge fluff via noise
+      let n = noise(x * noiseScale, y * noiseScale);
+      falloff *= map(n, 0, 1, 0.7, 1.3);
+      falloff = constrain(falloff, 0, 1);
+
+      // watery: low alpha
+      const alpha = falloff * 255 * 0.4;
+
+      brushTip.fill(255, 255, 255, alpha); // white; we’ll tint in paint[]
+      brushTip.rect(x, y, 1, 1);
+    }
+  }
+
+  // cache the pixels so we can read alpha when stamping
+  brushTip.loadPixels();
+  brushTipPixels = brushTip.pixels;
+  brushTipW = brushTip.width;
+  brushTipH = brushTip.height;
+}
+
 
 
 function initialCanvas() {
@@ -707,42 +725,38 @@ function uiPanel() {
 
 
 // --------Background Canvas----------------------
-//   let bgButtons = [];
+let bgButtons = [];
 
-// for (let i = 0; i < palette.length; i++) {
-//   const c = palette[i];
-//   const rgba = hex20Percent(c);
+for (let i = 0; i < palette.length; i++) {
+  const c = palette[i];       // original palette color
+  const displayColor = hex20Percent(c); // softened for UI
 
-//   let btn = createDiv("");
+  let btn = createDiv("");
 
-//   // button itself also shows transparency
-//   btn.style("background-color", rgba);
-//   btn.style("width", "24px");
-//   btn.style("height", "24px");
-//   btn.style("display", "inline-block");
-//   btn.style("margin-right", "6px");
-//   btn.style("border", "2px solid #ccc");
-//   btn.style("border-radius", "6px");
-//   btn.style("cursor", "pointer");
+  btn.style("background-color", displayColor);
+  btn.style("width", "24px");
+  btn.style("height", "24px");
+  btn.style("display", "inline-block");
+  btn.style("margin-right", "6px");
+  btn.style("border", "2px solid #ccc");
+  btn.style("border-radius", "6px");
+  btn.style("cursor", "pointer");
 
-//   btn.mousePressed(() => {
-//     // Set canvas container background
-//     const container = select("#canvas-container");
-//     container.style("background-color", hex20Percent(rgba));
+  btn.mousePressed(() => {
+    bgColor = color(hex20Percent(c));   
+    highlightBGButton(btn);
+  });
 
-//     highlightBGButton(btn);
-//   });
+  controlDiv.child(btn);
+  bgButtons.push(btn);
+}
 
-//   controlDiv.child(btn);
-//   bgButtons.push(btn);
-// }
-
-// function highlightBGButton(btn) {
-//   for (let b of bgButtons) {
-//     b.style("border", "2px solid #ccc");
-//   }
-//   btn.style("border", "2px solid black");
-// }
+function highlightBGButton(btn) {
+  for (let b of bgButtons) {
+    b.style("border", "2px solid #ccc");
+  }
+  btn.style("border", "2px solid black");
+}
 
 
 
@@ -852,6 +866,19 @@ buttonDefault.mousePressed(() => {
 //   showText = true;
 // });
 
+// --------Text Template------------------------
+
+  templateSelector = createSelect();
+  templateSelector.option("No Template", 0);
+  templateSelector.option("Template 1", 1);
+  templateSelector.option("Template 2", 2);
+
+  templateSelector.changed(() => {
+    currentTemplate = int(templateSelector.value());
+  });
+
+  controlDiv.child(createP("Text Template:"));
+  controlDiv.child(templateSelector);
   
 // --------Replay Animation------------------------
   replaySpeedSlider = createSlider(60, 1800, 300); // 1–30 seconds range
@@ -1141,7 +1168,7 @@ function highlightStateButton(btn) {
 
 function hex20Percent(hex) {
   const c = color(hex);
-  const o = 0.3; // 20% opacity flattened onto white
+  const o = 0.2; // 20% opacity flattened onto white
 
   const R = red(c)   * o + 255 * (1 - o);
   const G = green(c) * o + 255 * (1 - o);
@@ -1150,7 +1177,7 @@ function hex20Percent(hex) {
   return rgbToHex(R, G, B);
 }
 
-// Helper
+// helper to convert color
 function rgbToHex(r, g, b) {
   const toHex = v => {
     v = Math.round(v);
@@ -1158,5 +1185,33 @@ function rgbToHex(r, g, b) {
   };
   return "#" + toHex(r) + toHex(g) + toHex(b);
 }
+
+
+function drawTemplateOverlay() {
+  if (currentTemplate === 0) return;
+
+  let img;
+  if (currentTemplate === 1) img = svg1;
+  if (currentTemplate === 2) img = svg2;
+
+  if (!img) return;
+
+  // --- SCALE TO FIT CANVAS ---
+  let scaleFactor = Math.min(
+    width / img.width,
+    height / img.height
+  );
+
+  let newW = img.width * scaleFactor;
+  let newH = img.height * scaleFactor;
+
+  // --- CENTER POSITION ---
+  let x = (width - newW) / 2;
+  let y = 0;
+
+  // --- DRAW IMAGE ON TOP ---
+  image(img, x, y, newW, newH);
+}
+
 
 

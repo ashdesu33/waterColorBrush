@@ -1,7 +1,7 @@
 // Water Color brush made by Steve's Makerspace, modified with dynamic gradient
 // change color palette below
 const palettes = [
-  [ "#F94141", "#FC64DC", "#90E7E1", "#C2F57F", "#FFD944", "#FF7504", 
+  [ "#ff1a1aff", "#FC64DC", "#90E7FF", "#C2F57F", "#FFD944", "#FF7504", 
     "#5980FF", "#D6A7FF", "#172245", "#530B2F","#202B11"
   ]
 ];
@@ -57,6 +57,10 @@ let replaying = false;
 let replayProgress = 0;
 let replayDuration = 300;
 let replaySpeedSlider;
+let replayPhase = "idle";      
+let replayMode = "preview"; 
+let replayOpacity = 255;       
+let replayTimer = 0;          
 let capturer;
 let capturingReplay = false;
 let replayFrame = 0;
@@ -76,6 +80,8 @@ let strokeDistance = 0;
 const strokeGradientLength = 1000; 
 let stateButtons = [];
 let activeStateButton = null;
+
+const WHITE_HOLD_FRAMES = 18; 
 
 
 
@@ -144,56 +150,148 @@ function draw() {
   frameRate(60);
 
   if (replaying) {
-  // progress 0 → 1 over replayDuration frames
-  let t = replayProgress / replayDuration;
-  let easedT = easeInOut(constrain(t, 0, 1));
 
-  let total = recordedStrokes.length;
-  let currentIndex = floor(easedT * total);
+  // ============================
+  // EXPORT MODE
+  // ============================
+  if (replayMode === "export") {
 
-  // only draw the NEW strokes since last frame
-  for (let i = replayedUntil; i < currentIndex; i++) {
-    let s = recordedStrokes[i];
+    if (replayPhase === "preDelay") {
+      replayTimer++;
+      if (replayTimer >= 60) {
+        replayPhase = "draw";
+        replayTimer = 0;
+      }
+    }
 
-    // restore brush size for this stamp
-    sliderDrops.value(s.size);
+    else if (replayPhase === "draw") {
+      let t = replayProgress / replayDuration;
+      let easedT = easeInOut(constrain(t, 0, 1));
 
-    // IMPORTANT: use recorded gradient t
-    renderPoints(s.x, s.y, s.t);
+      let total = recordedStrokes.length;
+      let currentIndex = floor(easedT * total);
+
+      for (let i = replayedUntil; i < currentIndex; i++) {
+        let s = recordedStrokes[i];
+        sliderDrops.value(s.size);
+        renderPoints(s.x, s.y, s.t);
+      }
+
+      replayedUntil = currentIndex;
+      replayProgress++;
+
+      if (replayedUntil >= total) {
+        replayPhase = "postDelay";
+        replayTimer = 0;
+      }
+    }
+
+    else if (replayPhase === "postDelay") {
+      replayTimer++;
+      if (replayTimer >= 90) {
+        replayPhase = "fadeOut";
+        replayTimer = 0;
+      }
+    }
+
+    else if (replayPhase === "fadeOut") {
+      replayOpacity = map(replayTimer, 0, 90, 255, 0);
+      replayTimer++;
+
+      if (replayTimer >= 90) {
+        replayPhase = "whiteHold";   // ← FIX: transition to whiteHold
+        replayTimer = 0;             // reset timer for 0.3s hold
+      }
+    }
+
+    else if (replayPhase === "whiteHold") {
+    // show fully white screen for 0.3 seconds
+    replayTimer++;
+    if (replayTimer >= WHITE_HOLD_FRAMES) {
+      replayPhase = "idle";
+      replaying = false;
+  }
+}
   }
 
-  replayedUntil = currentIndex;
+  // ============================
+  // PREVIEW MODE
+  // ============================
+  else if (replayMode === "preview") {
 
-  replayProgress++;
-  if (replayProgress >= replayDuration || replayedUntil >= total) {
-    replaying = false;
+    let t = replayProgress / replayDuration;
+    let easedT = easeInOut(constrain(t, 0, 1));
+
+    let total = recordedStrokes.length;
+    let currentIndex = floor(easedT * total);
+
+    for (let i = replayedUntil; i < currentIndex; i++) {
+      let s = recordedStrokes[i];
+      sliderDrops.value(s.size);
+      renderPoints(s.x, s.y, s.t);
+    }
+
+    replayedUntil = currentIndex;
+    replayProgress++;
+
+    if (replayedUntil >= total) {
+      replaying = false;                  // FINISH clean
+      replayPhase = "idle";
+    }
   }
-} else {
-  paintDrop = sliderDrops.value();
-  addPaint();
 }
 
-  update();
-  render();
 
+  // --- NORMAL LIVE DRAWING ---
+  else {
+    paintDrop = sliderDrops.value();
+    addPaint();
+  }
+
+  // watercolor diffusion + render
+  if (replayPhase !== "fadeOut" && replayPhase !== "whiteHold") {
+    update();
+    render();
+  }
+
+  // UI text overlay
   addTextToCanvas();
-  
-    if (capturingReplay) {
+
+    // --- APPLY FADE OUT LAYER ---
+  // APPLY WHITE OVERLAY IN FADE + HOLD
+if (replayPhase === "fadeOut" || replayPhase === "whiteHold") {
+  push();
+  noStroke();
+
+  if (replayPhase === "fadeOut") {
+    // gradually fade to white
+    fill(backgrd, 255 - replayOpacity);
+  } else {
+    // fully white during hold
+    fill(backgrd);
+  }
+  rect(0, 0, width, height);
+  pop();
+}
+
+  // CAPTURE VIDEO IF RECORDING
+  if (capturingReplay) {
     const canvasElement = document.getElementById("defaultCanvas0");
-    if (canvasElement) {
-      capturer.capture(canvasElement);
-    }
+    if (canvasElement) capturer.capture(canvasElement);
+
     replayFrame++;
 
-    // when replay ends, stop and save video
-    if (!replaying) {
+    if (replayPhase === "whiteHold" && replayTimer >= (WHITE_HOLD_FRAMES - 5)){
       capturingReplay = false;
       capturer.stop();
-      capturer.save(); // triggers download of webm
+      capturer.save();
+      replayPhase = "idle";
+      replaying = false;
+  
     }
   }
-}
 
+}
 
 
 function initialCanvas() {
@@ -333,7 +431,12 @@ function renderPoints(cx, cy, strokeT = 0, paletteIndexOverride = null, colorInd
   const halfH = baseSize * 0.5;
 
   // watery: global alpha factor for this stamp
-  const globalAlphaFactor = 0.5;         // smaller = more transparent
+const globalAlphaFactor = 0.5;
+let sizePigmentBoost = 0.9;
+if (s <= 5){
+  sizePigmentBoost = map(s, 0, 5, 5, 1.0);
+}
+map(s, 0, 10, 2, 1.0);
 
   // loop over the stamp area on canvas
   const xStart = Math.max(0, Math.floor(cx - halfW));
@@ -358,7 +461,7 @@ function renderPoints(cx, cy, strokeT = 0, paletteIndexOverride = null, colorInd
 
       if (tipA <= 0.01) continue; // nothing from this texel
 
-      const contribution = tipA * globalAlphaFactor;
+      const contribution = tipA * globalAlphaFactor * sizePigmentBoost;
       if (contribution <= 0.001) continue;
 
       const idx = (px + py * w) * 4;
@@ -590,9 +693,6 @@ function smoothstep(edge0, edge1, x) {
 
 
 
-
-
-
 // ******* UI Panel function *********
 function uiPanel() {
   let buttonX = 20;
@@ -603,17 +703,47 @@ function uiPanel() {
   const controlDiv = select("#controls");
   
   controlDiv.child(createP("Canvas Background:"));
-  const bgPicker = createColorPicker("#ffffff");
-  bgPicker.input(() => {
-    // Change background of the canvas container live
-    const container = select("#canvas-container");
-    container.style("background-color", bgPicker.value());
-  });
-  bgPicker.mousePressed(() => {
-    activeGradientPicker = 3;
-    updateActiveHighlight();
-  });
-  controlDiv.child(bgPicker);
+
+
+
+// --------Background Canvas----------------------
+//   let bgButtons = [];
+
+// for (let i = 0; i < palette.length; i++) {
+//   const c = palette[i];
+//   const rgba = hex20Percent(c);
+
+//   let btn = createDiv("");
+
+//   // button itself also shows transparency
+//   btn.style("background-color", rgba);
+//   btn.style("width", "24px");
+//   btn.style("height", "24px");
+//   btn.style("display", "inline-block");
+//   btn.style("margin-right", "6px");
+//   btn.style("border", "2px solid #ccc");
+//   btn.style("border-radius", "6px");
+//   btn.style("cursor", "pointer");
+
+//   btn.mousePressed(() => {
+//     // Set canvas container background
+//     const container = select("#canvas-container");
+//     container.style("background-color", hex20Percent(rgba));
+
+//     highlightBGButton(btn);
+//   });
+
+//   controlDiv.child(btn);
+//   bgButtons.push(btn);
+// }
+
+// function highlightBGButton(btn) {
+//   for (let b of bgButtons) {
+//     b.style("border", "2px solid #ccc");
+//   }
+//   btn.style("border", "2px solid black");
+// }
+
 
 
   
@@ -768,19 +898,18 @@ function clearHighlight() {
 function startReplay() {
   if (recordedStrokes.length === 0) return;
 
-  // read requested duration (frames at 60fps)
-  replayDuration = replaySpeedSlider
-    ? replaySpeedSlider.value()
-    : replayDuration;
+  replayMode = "preview";                 // <— important
+  replayDuration = replaySpeedSlider.value();
 
-  // reset state
-  replaying = true;
-  replayProgress = 0;
-  replayedUntil = 0;
-
-  // clear canvas + paint arrays
   background(backgrd);
   initialCanvas();
+
+  replaying = true;
+  replayPhase = "draw";                   // <— preview starts immediately
+  replayProgress = 0;
+  replayedUntil = 0;
+  replayOpacity = 255;
+  replayTimer = 0;
 }
 
 
@@ -972,31 +1101,26 @@ function bakeTextToCanvas() {
 function startReplayRecording() {
   if (recordedStrokes.length === 0) return;
 
-  // same duration logic as normal replay
-  replayDuration = replaySpeedSlider
-    ? replaySpeedSlider.value()
-    : replayDuration;
-  // set up CCapture
-  capturer = new CCapture({
-    format: "webm",
-    framerate: 60,
-    quality: 100,
-  });
+  replayMode = "export";                  // <— important
+  replayDuration = replaySpeedSlider.value();
 
-  capturingReplay = true;
-  replayFrame = 0;
-
-  // reset state & canvas
-  replaying = true;
-  replayProgress = 0;
-  replayedUntil = 0;
+  capturer = new CCapture({ format:"webm", framerate:60, quality:100 });
 
   background(backgrd);
   initialCanvas();
 
-  // start capturing after first clean frame
+  replaying = true;
+  replayPhase = "preDelay";               // <— export has preDelay
+  replayProgress = 0;
+  replayedUntil = 0;
+  replayOpacity = 255;
+  replayTimer = 0;
+
+  capturingReplay = true;
   capturer.start();
 }
+
+
 
 function highlightStateButton(btn) {
   // turn off highlight for all state buttons
@@ -1014,5 +1138,25 @@ function highlightStateButton(btn) {
   activeStateButton = btn;
 }
 
+
+function hex20Percent(hex) {
+  const c = color(hex);
+  const o = 0.3; // 20% opacity flattened onto white
+
+  const R = red(c)   * o + 255 * (1 - o);
+  const G = green(c) * o + 255 * (1 - o);
+  const B = blue(c)  * o + 255 * (1 - o);
+
+  return rgbToHex(R, G, B);
+}
+
+// Helper
+function rgbToHex(r, g, b) {
+  const toHex = v => {
+    v = Math.round(v);
+    return ("0" + v.toString(16)).slice(-2);
+  };
+  return "#" + toHex(r) + toHex(g) + toHex(b);
+}
 
 

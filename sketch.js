@@ -2,7 +2,7 @@
 // change color palette below
 const palettes = [
   [ "#ff1a1aff", "#FC64DC", "#90E7FF", "#C2F57F", "#FFD944", "#FF7504", 
-    "#5980FF", "#D6A7FF", "#172245", "#530B2F","#202B11"
+    "#5980FF", "#D6A7FF", "#172245","#202B11","#530B2F"
   ]
 ];
 
@@ -26,8 +26,8 @@ let gradientMix = 0;
 let strokeGradientT = 0;
 let strokeActive = false;
 let templateSelector;
-let currentTemplate = 0; // 0 = none, 1 = template1, 2 = template2
-let svg1, svg2;
+let currentTemplate = 0; // 0 = tem_default, 1 = template1, 2 = template2
+let svg1, svg2,tem_default;
 let bgColor = "#fff"
 // ------------ Var:Brush ---------------
 let defaultTime = 0.001;
@@ -90,13 +90,14 @@ const WHITE_HOLD_FRAMES = 18;
 
 function preload() {
   // customFont = loadFont("ABCGravityVariable-Trial.ttf"); 
+  tem_default = loadImage("./template/default.svg")
   svg1 = loadImage("./template/template_1.svg");
   svg2 = loadImage("./template/template_2.svg");
 }
 
 function setup() {
   pixelDensity(1);
-  const canvas = createCanvas(640, 800);
+  const canvas = createCanvas(800, 1000);
   canvas.parent("canvas-container");
   background(backgrd);
   uiPanel();
@@ -155,20 +156,20 @@ function draw() {
     else if (replayPhase === "postDelay") {
       replayTimer++;
       if (replayTimer >= 90) {
-        replayPhase = "fadeOut";
+        replayPhase = "whiteHold";
         replayTimer = 0;
       }
     }
 
-    else if (replayPhase === "fadeOut") {
-      replayOpacity = map(replayTimer, 0, 90, 255, 0);
-      replayTimer++;
+    // else if (replayPhase === "fadeOut") {
+    //   replayOpacity = map(replayTimer, 0, 90, 255, 0);
+    //   replayTimer++;
 
-      if (replayTimer >= 90) {
-        replayPhase = "whiteHold";   // ← FIX: transition to whiteHold
-        replayTimer = 0;             // reset timer for 0.3s hold
-      }
-    }
+    //   if (replayTimer >= 90) {
+    //     replayPhase = "whiteHold";   // ← FIX: transition to whiteHold
+    //     replayTimer = 0;             // reset timer for 0.3s hold
+    //   }
+    // }
 
     else if (replayPhase === "whiteHold") {
     // show fully white screen for 0.3 seconds
@@ -234,20 +235,20 @@ blendMode(BLEND);
 
     // --- APPLY FADE OUT LAYER ---
   // APPLY WHITE OVERLAY IN FADE + HOLD
-if (replayPhase === "fadeOut" || replayPhase === "whiteHold") {
-  push();
-  noStroke();
+// if (replayPhase === "fadeOut" || replayPhase === "whiteHold") {
+//   push();
+//   noStroke();
 
-  if (replayPhase === "fadeOut") {
-    // gradually fade to white
-    fill(backgrd, 255 - replayOpacity);
-  } else {
-    // fully white during hold
-    fill(backgrd);
-  }
-  rect(0, 0, width, height);
-  pop();
-}
+//   if (replayPhase === "fadeOut") {
+//     // gradually fade to white
+//     fill(backgrd, 255 - replayOpacity);
+//   } else {
+//     // fully white during hold
+//     fill(backgrd);
+//   }
+//   rect(0, 0, width, height);
+//   pop();
+// }
 
   // CAPTURE VIDEO IF RECORDING
   if (capturingReplay) {
@@ -625,12 +626,23 @@ function update() {
 
 function render() {
   loadPixels();
+  const d = pixelDensity();
+
   for (let x = 0; x < width; x++) {
     for (let y = 0; y < height; y++) {
-      let pix = (x + y * width) * 4;
-      pixels[pix] = paint[pix];
-      pixels[pix + 1] = paint[pix + 1];
-      pixels[pix + 2] = paint[pix + 2];
+      let paintIdx = (x + y * width) * 4;
+
+      // Write each logical pixel to all physical sub-pixels
+      for (let sx = 0; sx < d; sx++) {
+        for (let sy = 0; sy < d; sy++) {
+          let px = (x * d + sx) + (y * d + sy) * (width * d);
+          let pix = px * 4;
+          pixels[pix]     = paint[paintIdx];
+          pixels[pix + 1] = paint[paintIdx + 1];
+          pixels[pix + 2] = paint[paintIdx + 2];
+          pixels[pix + 3] = 255;
+        }
+      }
     }
   }
   updatePixels();
@@ -716,10 +728,11 @@ function uiPanel() {
   let buttonX = 20;
   let buttonY = 20;
   let buttonSize = 24;
+  let spacer = createDiv("");
+  spacer.class('spacer');
 
   // Sidebar controls
   const controlDiv = select("#controls");
-  
   controlDiv.child(createP("Canvas Background:"));
 
 
@@ -758,6 +771,8 @@ function highlightBGButton(btn) {
   btn.style("border", "2px solid black");
 }
 
+controlDiv.child(spacer);
+
 
 
   
@@ -790,6 +805,10 @@ for (let i = 0; i < palette.length; i++) {
   controlDiv.child(btn);
   colorButtons.push(btn);
 }
+
+let spacer2 = createDiv("");
+spacer2.class('spacer');
+controlDiv.child(spacer2);
   
   
 
@@ -804,6 +823,8 @@ function refreshColorButtons() {
   // keep currentColorIndex valid for the new palette
   currentColorIndex = currentColorIndex % p.length;
 }
+
+
   
   
 // --------Brush Gradient----------------------
@@ -818,12 +839,21 @@ gradientToggle.changed(() => {
 });
 controlDiv.child(gradientToggle);
 
+let spacer3 = createDiv("");
+spacer3.class('spacer');
+controlDiv.child(spacer3);
+
+
   
 // --------Bursh Size----------------------
 
   controlDiv.child(createP("Brush Size:"));
-  sliderDrops = createSlider(0, 10, 5);
+  sliderDrops = createSlider(0, 30, 15);
   controlDiv.child(sliderDrops);
+
+  let spacer4 = createDiv("");
+  spacer4.class('spacer');
+  controlDiv.child(spacer4);
 
   
   
@@ -850,6 +880,10 @@ buttonDefault.mousePressed(() => {
   setDryMode("default");
   highlightStateButton(buttonDefault);
 });
+
+  let spacer5 = createDiv("");
+  spacer5.class('spacer');
+  controlDiv.child(spacer5);
   
 // --------Add Text------------------------
 // controlDiv.child(createP("Add Text:"));
@@ -879,6 +913,10 @@ buttonDefault.mousePressed(() => {
 
   controlDiv.child(createP("Text Template:"));
   controlDiv.child(templateSelector);
+  let spacer6 = createDiv("");
+  spacer6.class('spacer');
+  controlDiv.child(spacer6);
+
   
 // --------Replay Animation------------------------
   replaySpeedSlider = createSlider(60, 1800, 300); // 1–30 seconds range
@@ -1188,9 +1226,8 @@ function rgbToHex(r, g, b) {
 
 
 function drawTemplateOverlay() {
-  if (currentTemplate === 0) return;
-
   let img;
+  if (currentTemplate === 0) img = tem_default;
   if (currentTemplate === 1) img = svg1;
   if (currentTemplate === 2) img = svg2;
 
